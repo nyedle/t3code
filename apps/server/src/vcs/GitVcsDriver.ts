@@ -475,7 +475,7 @@ export const makeVcsDriverShape = Effect.fn("makeGitVcsDriverShape")(function* (
       .run({
         operation: "GitVcsDriver.sshConfig",
         command: "ssh",
-        args: ["-G", host],
+        args: ["-G", "--", host],
         cwd,
         allowNonZeroExit: true,
         timeoutMs: 5_000,

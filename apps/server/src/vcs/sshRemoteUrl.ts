@@ -14,7 +14,7 @@ export const sshConfigProbe =
   (processRunner: ProcessRunner.ProcessRunner["Service"]): SshConfigProbe =>
   (host) =>
     processRunner
-      .run({ command: "ssh", args: ["-G", host], timeoutBehavior: "timedOutResult" })
+      .run({ command: "ssh", args: ["-G", "--", host], timeoutBehavior: "timedOutResult" })
       .pipe(
         Effect.map((result) => result.stdout),
         Effect.orElseSucceed(() => ""),
