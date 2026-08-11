@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
-import { canonicalizeSshRemoteUrl } from "./sshRemoteUrl.ts";
+import { canonicalizeSshRemoteUrl, SshHostnameCache } from "./sshRemoteUrl.ts";
 
 const sshConfig = (hostname: string) => (host: string) =>
   Effect.succeed(`host ${host}\r\nhostname ${hostname}\r\nport 22\r\nuser git\r\n`);
@@ -38,7 +38,18 @@ describe("canonicalizeSshRemoteUrl", () => {
       yield* canonicalizeSshRemoteUrl("git@cached-alias:pingdotgg/t3chat.git", probe);
       yield* canonicalizeSshRemoteUrl("git@cached-alias:pingdotgg/t3code.git", probe);
       expect(probes).toBe(1);
-    }),
+    }).pipe(Effect.provideService(SshHostnameCache, new Map())),
+  );
+
+  it.effect("retries after a failed probe instead of caching it", () =>
+    Effect.gen(function* () {
+      const results = ["", "hostname github.com\n"];
+      const probe = () => Effect.succeed(results.shift() ?? "");
+      yield* canonicalizeSshRemoteUrl("git@flaky:pingdotgg/t3chat.git", probe);
+      expect(yield* canonicalizeSshRemoteUrl("git@flaky:pingdotgg/t3chat.git", probe)).toBe(
+        "git@github.com:pingdotgg/t3chat.git",
+      );
+    }).pipe(Effect.provideService(SshHostnameCache, new Map())),
   );
 
   it.effect("leaves non-ssh remotes and local paths alone", () =>
