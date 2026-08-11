@@ -1,0 +1,77 @@
+import { describe, expect, it } from "@effect/vitest";
+import * as Effect from "effect/Effect";
+
+import { canonicalizeSshRemoteUrl } from "./sshRemoteUrl.ts";
+
+const sshConfig = (hostname: string) => (host: string) =>
+  Effect.succeed(`host ${host}\r\nhostname ${hostname}\r\nport 22\r\nuser git\r\n`);
+
+const unresolved = (host: string) => Effect.succeed(`hostname ${host}\n`);
+
+describe("canonicalizeSshRemoteUrl", () => {
+  it.effect("resolves an scp-style alias to its configured hostname", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* canonicalizeSshRemoteUrl("git@alt:pingdotgg/t3chat.git", sshConfig("github.com")),
+      ).toBe("git@github.com:pingdotgg/t3chat.git");
+    }),
+  );
+
+  it.effect("resolves an alias in an ssh:// remote, port and path intact", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* canonicalizeSshRemoteUrl(
+          "ssh://git@work-main:2222/pingdotgg/t3chat.git",
+          sshConfig("gitlab.example.com"),
+        ),
+      ).toBe("ssh://git@gitlab.example.com:2222/pingdotgg/t3chat.git");
+    }),
+  );
+
+  it.effect("probes each host once", () =>
+    Effect.gen(function* () {
+      let probes = 0;
+      const probe = (host: string) => {
+        probes += 1;
+        return sshConfig("github.com")(host);
+      };
+      yield* canonicalizeSshRemoteUrl("git@cached-alias:pingdotgg/t3chat.git", probe);
+      yield* canonicalizeSshRemoteUrl("git@cached-alias:pingdotgg/t3code.git", probe);
+      expect(probes).toBe(1);
+    }),
+  );
+
+  it.effect("leaves non-ssh remotes and local paths alone", () =>
+    Effect.gen(function* () {
+      const failing = () => Effect.die("ssh must not be probed");
+      for (const remoteUrl of [
+        "https://github.com/pingdotgg/t3chat.git",
+        "git://github.com/pingdotgg/t3chat.git",
+        "/home/me/repo",
+        "C:/Users/me/repo",
+        "C:\\Users\\me\\repo",
+        "../sibling/repo",
+      ]) {
+        expect(yield* canonicalizeSshRemoteUrl(remoteUrl, failing)).toBe(remoteUrl);
+      }
+    }),
+  );
+
+  it.effect("leaves a host that ssh does not rewrite alone", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* canonicalizeSshRemoteUrl("git@github.com:pingdotgg/t3chat.git", unresolved),
+      ).toBe("git@github.com:pingdotgg/t3chat.git");
+    }),
+  );
+
+  it.effect("keeps the remote when ssh cannot be run", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* canonicalizeSshRemoteUrl("git@no-ssh-here:pingdotgg/t3chat.git", () =>
+          Effect.succeed(""),
+        ),
+      ).toBe("git@no-ssh-here:pingdotgg/t3chat.git");
+    }),
+  );
+});
