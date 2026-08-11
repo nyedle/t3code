@@ -52,6 +52,20 @@ describe("canonicalizeSshRemoteUrl", () => {
     }).pipe(Effect.provideService(SshHostnameCache, new Map())),
   );
 
+  it.effect("brackets an IPv6 hostname before substitution", () =>
+    Effect.gen(function* () {
+      expect(
+        yield* canonicalizeSshRemoteUrl("git@v6:pingdotgg/t3chat.git", sshConfig("2001:db8::1")),
+      ).toBe("git@[2001:db8::1]:pingdotgg/t3chat.git");
+      expect(
+        yield* canonicalizeSshRemoteUrl(
+          "ssh://git@v6:2222/pingdotgg/t3chat.git",
+          sshConfig("2001:db8::1"),
+        ),
+      ).toBe("ssh://git@[2001:db8::1]:2222/pingdotgg/t3chat.git");
+    }).pipe(Effect.provideService(SshHostnameCache, new Map())),
+  );
+
   it.effect("leaves non-ssh remotes and local paths alone", () =>
     Effect.gen(function* () {
       const failing = () => Effect.die("ssh must not be probed");

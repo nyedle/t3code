@@ -49,7 +49,8 @@ export const canonicalizeSshRemoteUrl = Effect.fnUntraced(function* (
     hostname = probed ?? host;
   }
 
-  return hostname === host
-    ? remoteUrl
-    : remoteUrl.replace(hostPattern(remoteUrl), (_, prefix: string) => prefix + hostname);
+  if (hostname === host) return remoteUrl;
+  const substituted =
+    hostname.includes(":") && !hostname.startsWith("[") ? `[${hostname}]` : hostname;
+  return remoteUrl.replace(hostPattern(remoteUrl), (_, prefix: string) => prefix + substituted);
 });
