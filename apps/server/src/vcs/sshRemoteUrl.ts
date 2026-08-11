@@ -1,5 +1,7 @@
 import * as Effect from "effect/Effect";
 
+import type * as ProcessRunner from "../processRunner.ts";
+
 const SSH_URL_HOST = /^(ssh:\/\/(?:[^@/]*@)?)([^@:/]+)/iu;
 const SCP_URL_HOST = /^((?:[^@:/]*@)?)([^@:/]{2,})(?=:(?!\/))/u;
 
@@ -7,6 +9,16 @@ const hostPattern = (remoteUrl: string): RegExp =>
   /^ssh:\/\//iu.test(remoteUrl) ? SSH_URL_HOST : SCP_URL_HOST;
 
 export type SshConfigProbe = (host: string) => Effect.Effect<string>;
+
+export const sshConfigProbe =
+  (processRunner: ProcessRunner.ProcessRunner["Service"]): SshConfigProbe =>
+  (host) =>
+    processRunner
+      .run({ command: "ssh", args: ["-G", host], timeoutBehavior: "timedOutResult" })
+      .pipe(
+        Effect.map((result) => result.stdout),
+        Effect.orElseSucceed(() => ""),
+      );
 
 const HOSTNAME_TTL_MS = 5 * 60_000;
 const effectiveHostnames = new Map<string, { readonly at: number; readonly hostname: string }>();
